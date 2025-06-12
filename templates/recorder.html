@@ -1,18 +1,16 @@
-
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Recorder</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="static/recorder.css">
   </head>
   <body>
     <h1>Hola mundo</h1>
 
     <div class="container">
-
         <div class="row mt-3 px-3">
             <div class="col-12 text-center">
                 <button type="button" class="btn-record btn-record-green" id="record" onclick="record()">
@@ -20,7 +18,9 @@
                 </button>
                 <button type="button" class="btn-record btn-record-red" id="stop" onclick="stop()" style="display:none">
                     <img class="mic-img" id="record-stop-label" src="static/img/microphone.png" />
-                    <span id="record-stop-loading" style="display: none"><span class="spinner-border spinner-border-sm record-spinner" role="status" aria-hidden="true"></span></span>
+                    <span id="record-stop-loading" style="display: none">
+                        <span class="spinner-border spinner-border-sm record-spinner" role="status" aria-hidden="true"></span>
+                    </span>
                 </button>
             </div>
             <div class="col-12 text-center mt-2">
@@ -29,27 +29,102 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+    <script>
+        let blobs = [];
+        let stream;
+        let rec;
+        let recordUrl;
+        let audioResponseHandler;
 
-    <script src="static/recorder.js"></script>
+        function recorder(url, handler) {
+            recordUrl = url;
+            if (typeof handler !== "undefined") {
+                audioResponseHandler = handler;
+            }
+        }
 
-    <script type="text/javascript">
-        recorder("/audio", response => {
-            document.getElementById("record").style.display="";
-            document.getElementById("stop").style.display="none";
+        async function record() {
+            try {
+                document.getElementById("text").innerHTML = "<i>Grabando...</i>";
+                document.getElementById("record").style.display = "none";
+                document.getElementById("stop").style.display = "";
+                document.getElementById("record-stop-label").style.display = "block";
+                document.getElementById("record-stop-loading").style.display = "none";
+                document.getElementById("stop").disabled = false;
+
+                blobs = [];
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                rec = new MediaRecorder(stream);
+                rec.ondataavailable = e => { if (e.data) blobs.push(e.data); };
+                rec.onstop = doPreview;
+                rec.start();
+            } catch (e) {
+                alert("No fue posible iniciar el grabador de audio! Verifica los permisos, HTTPS, etc...");
+            }
+        }
+
+        function doPreview() {
+            if (!blobs.length) {
+                console.log("No hay blobios!");
+            } else {
+                console.log("Tenemos blobios!");
+                const blob = new Blob(blobs);
+                var fd = new FormData();
+                fd.append("audio", blob, "audio");
+
+                fetch(recordUrl, {
+                    method: "POST",
+                    body: fd,
+                })
+                .then((response) => response.json())
+                .then(audioResponseHandler)
+                .catch(err => {
+                    console.log("Oops: Ocurrió un error", err);
+                });
+            }
+        }
+
+        function stop() {
+            document.getElementById("record-stop-label").style.display = "none";
+            document.getElementById("record-stop-loading").style.display = "block";
+            document.getElementById("stop").disabled = true;
+            rec.stop();
+        }
+
+        function handleAudioResponse(response) {
             if (!response || response == null) {
-                //Hola mi creador no implemento algo bueno aqui hoho
                 console.log("No response");
                 return;
             }
-            console.log("El texto fue: " + response.text)
+
+            document.getElementById("record").style.display = "";
+            document.getElementById("stop").style.display = "none";
+
+            if (audioResponseHandler != null) {
+                audioResponseHandler(response);
+            }
+        }
+
+        recorder("/audio", response => {
+            document.getElementById("record").style.display = "";
+            document.getElementById("stop").style.display = "none";
+
+            if (!response || response.result === "error") {
+                console.log("No se pudo generar audio.");
+                document.getElementById("text").innerHTML = response.text || "(Sin respuesta de texto)";
+                return;
+            }
+
+            console.log("El texto fue: " + response.text);
             document.getElementById("text").innerHTML = response.text;
-            if (typeof response.file !== "undefined") {
-                //Reproducir el audio que regreso Python (si existe)
-                audioFile = response.file;
-                let audio = new Audio();
-                audio.setAttribute("src", "static/" + audioFile);
-                audio.play();
+
+            if (typeof response.file !== "undefined" && response.file != null) {
+                const audio = new Audio(`/static/${response.file}?nocache=${new Date().getTime()}`);
+                audio.play().catch(e => {
+                    console.log("Error al reproducir audio:", e);
+                });
+            } else {
+                console.warn("⚠️ No se generó archivo de audio, o falló el TTS.");
             }
         });
     </script>

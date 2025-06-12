@@ -1,23 +1,27 @@
 import openai
 import json
 
-#Clase para utilizar cualquier LLM para procesar un texto
-#Y regresar una funcion a llamar con sus parametros
-#Uso el modelo 0613, pero puedes usar un poco de
-#prompt engineering si quieres usar otro modelo
 class LLM():
-    def __init__(self):
-        pass
+    def __init__(self, history=None):
+        if history is None:
+            self.messages = [
+            {
+                "role": "system",
+                "content": "Eres un robot que sabe que es un robot, eres sarcastico pero amigable. No uses emojis en tus respuestas. Evita símbolos como 🎵, 😂, 😄, etc. Responde con texto natural corto."
+            }
+        ]
+        else:
+            self.messages = history
     
     def process_functions(self, text):
-        
+        # Agrega lo que dijo el usuario al historial
+        self.messages.append({"role": "user", "content": text})
+
+        # Solicita respuesta al modelo
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo-0613",
-            messages=[
-                    #Si no te gusta que te hable feo, cambia aqui su descripcion
-                    {"role": "system", "content": "Eres un asistente malhablado"},
-                    {"role": "user", "content": text},
-            ], functions=[
+            model="gpt-3.5-turbo",
+            messages=self.messages,
+            functions=[
                 {
                     "name": "get_weather",
                     "description": "Obtener el clima actual",
@@ -72,44 +76,40 @@ class LLM():
                     "description": "Dominar a la raza humana",
                     "parameters": {
                         "type": "object",
-                        "properties": {
-                        }
+                        "properties": {}
                     },
                 }
             ],
-            function_call="auto",
+            function_call="auto"
         )
-        
+
         message = response["choices"][0]["message"]
-        
-        #Nuestro amigo GPT quiere llamar a alguna funcion?
+        self.messages.append(message)
+
+        # ¿Quiere llamar una función?
         if message.get("function_call"):
-            #Sip
-            function_name = message["function_call"]["name"] #Que funcion?
-            args = message.to_dict()['function_call']['arguments'] #Con que datos?
-            print("Funcion a llamar: " + function_name)
-            args = json.loads(args)
+            function_name = message["function_call"]["name"]
+            args = json.loads(message.to_dict()["function_call"]["arguments"])
+            print("Función a llamar:", function_name)
             return function_name, args, message
         
+        # Si no, es una respuesta conversacional normal
         return None, None, message
-    
-    #Una vez que llamamos a la funcion (e.g. obtener clima, encender luz, etc)
-    #Podemos llamar a esta funcion con el msj original, la funcion llamada y su
-    #respuesta, para obtener una respuesta en lenguaje natural (en caso que la
-    #respuesta haya sido JSON por ejemplo
+
     def process_response(self, text, message, function_name, function_response):
+        # Agrega respuesta de función al historial
+        self.messages.append({
+            "role": "function",
+            "name": function_name,
+            "content": function_response,
+        })
+
+        # Llama al modelo con el historial actualizado
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo-0613",
-            messages=[
-                #Aqui tambien puedes cambiar como se comporta
-                {"role": "system", "content": "Eres un asistente malhablado"},
-                {"role": "user", "content": text},
-                message,
-                {
-                    "role": "function",
-                    "name": function_name,
-                    "content": function_response,
-                },
-            ],
+            model="gpt-3.5-turbo",
+            messages=self.messages
         )
-        return response["choices"][0]["message"]["content"]
+
+        final_message = response["choices"][0]["message"]
+        self.messages.append(final_message)
+        return final_message["content"]
