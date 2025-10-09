@@ -1,7 +1,5 @@
 
 # Asistente virtual
-Este repositorio es el código para el video del Asistente Virtual en el canal Ringa Tech:
-https://youtu.be/-0tIy8wWtzE
 
 ## Configuración
 Para ejecutar el proyecto es necesario:
@@ -29,11 +27,7 @@ El proyecto cuenta con algunas cosas que quizá quieras modificar, por ejemplo:
 	- Espera y ve como domina al mundo
 
 
-## ¿Problemas?
-
-Solo lo probé en mi equipo así que si tienes problemas, levanta un issue aquí en Github, con el mayor detalle que puedas (versión de python, de paquetes, mensaje completo de error, etc).
-
-Si eres ninja y lo solucionas, ¡levanta un Pull Request!
 
 ## Licencias
+
 - Imagen de micrófono por Freepik
