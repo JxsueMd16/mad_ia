@@ -4,18 +4,24 @@ import requests
 from gtts import gTTS
 
 # Texto a voz con ElevenLabs y fallback offline (gTTS)
-class TTS():
+class TTS:
     def __init__(self):
         load_dotenv()
         self.key = os.getenv('ELEVENLABS_API_KEY')
+        self.voice_id = "pNInz6obpgDQGcFmaJgB"  # voz base; puedes cambiarla en tu cuenta
 
     def process(self, text):
         CHUNK_SIZE = 1024
         file_name = "response.mp3"
+        os.makedirs("static", exist_ok=True)
         file_path = os.path.join("static", file_name)
 
+        # Intento ElevenLabs
         try:
-            url = "https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB"
+            if not self.key:
+                raise Exception("ELEVENLABS_API_KEY no configurada")
+
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}"
             headers = {
                 "Accept": "audio/mpeg",
                 "Content-Type": "application/json",
@@ -24,13 +30,9 @@ class TTS():
             data = {
                 "text": text,
                 "model_id": "eleven_multilingual_v1",
-                "voice_settings": {
-                    "stability": 0.55,
-                    "similarity_boost": 0.55
-                }
+                "voice_settings": {"stability": 0.55, "similarity_boost": 0.55}
             }
-
-            response = requests.post(url, json=data, headers=headers)
+            response = requests.post(url, json=data, headers=headers, stream=True, timeout=30)
             print("TTS status:", response.status_code)
 
             if response.status_code != 200:
@@ -45,6 +47,7 @@ class TTS():
 
         except Exception as e:
             print("Usando gTTS como fallback debido a:", e)
+            # Fallback gTTS
             try:
                 tts = gTTS(text=text, lang='es')
                 tts.save(file_path)

@@ -1,132 +1,191 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Recorder</title>
+    <title>Asistente de Voz IA</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="static/recorder.css">
+    <style>
+      body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+      .container { max-width: 600px; }
+      .btn-record { border: none; background: transparent; transition: transform 0.2s; }
+      .btn-record:hover { transform: scale(1.05); }
+      .btn-record-green { filter: hue-rotate(80deg); }
+      .btn-record-red { filter: hue-rotate(0deg); animation: pulse 1.5s infinite; }
+      .mic-img { width: 96px; height: 96px; cursor: pointer; }
+      .record-spinner { vertical-align: middle; }
+      .text-box { 
+        background: rgba(255,255,255,0.95); 
+        border-radius: 12px; 
+        padding: 20px; 
+        min-height: 100px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      }
+      .robot-status { 
+        color: white; 
+        font-size: 0.9rem; 
+        margin-top: 10px;
+        opacity: 0.9;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+    </style>
   </head>
   <body>
-    <h1>Hola mundo</h1>
+    <div class="container py-4">
+      <h1 class="h3 text-center text-white mb-4">🤖 Asistente Robot</h1>
 
-    <div class="container">
-        <div class="row mt-3 px-3">
-            <div class="col-12 text-center">
-                <button type="button" class="btn-record btn-record-green" id="record" onclick="record()">
-                    <img class="mic-img" src="static/img/microphone.png" />
-                </button>
-                <button type="button" class="btn-record btn-record-red" id="stop" onclick="stop()" style="display:none">
-                    <img class="mic-img" id="record-stop-label" src="static/img/microphone.png" />
-                    <span id="record-stop-loading" style="display: none">
-                        <span class="spinner-border spinner-border-sm record-spinner" role="status" aria-hidden="true"></span>
-                    </span>
-                </button>
-            </div>
-            <div class="col-12 text-center mt-2">
-                <div id="text"></div>
-            </div>
+      <div class="row mt-3 px-3">
+        <div class="col-12 text-center">
+          <!-- Botón grabar -->
+          <button type="button" class="btn-record btn-record-green" id="record" onclick="record()">
+            <img class="mic-img" src="/static/img/microphone.png" alt="grabar" />
+          </button>
+          
+          <!-- Botón detener -->
+          <button type="button" class="btn-record btn-record-red" id="stop" onclick="stopRec()" style="display:none">
+            <img class="mic-img" id="record-stop-label" src="/static/img/microphone.png" alt="detener" />
+            <span id="record-stop-loading" style="display: none">
+              <span class="spinner-border spinner-border-sm record-spinner text-light" role="status"></span>
+            </span>
+          </button>
+          
+          <div class="robot-status" id="status">Presiona el micrófono para hablar</div>
         </div>
+        
+        <div class="col-12 text-center mt-4">
+          <div id="text" class="text-box">Esperando comando...</div>
+        </div>
+      </div>
     </div>
 
-    <script>
-        let blobs = [];
-        let stream;
-        let rec;
-        let recordUrl;
-        let audioResponseHandler;
+<script>
+  let blobs = [];
+  let stream;
+  let rec;
+  let recordStartTime;
 
-        function recorder(url, handler) {
-            recordUrl = url;
-            if (typeof handler !== "undefined") {
-                audioResponseHandler = handler;
-            }
+  function updateStatus(msg) {
+    document.getElementById("status").textContent = msg;
+  }
+
+  async function record() {
+    try {
+      updateStatus("🔴 Grabando... Habla ahora");
+      document.getElementById("text").innerHTML = "<i style='color: #667eea;'>Escuchando...</i>";
+      document.getElementById("record").style.display = "none";
+      document.getElementById("stop").style.display = "";
+      document.getElementById("record-stop-label").style.display = "block";
+      document.getElementById("record-stop-loading").style.display = "none";
+      document.getElementById("stop").disabled = false;
+
+      blobs = [];
+      recordStartTime = Date.now();
+
+      // Configuración de audio optimizada
+      const constraints = { 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }, 
+        video: false 
+      };
+      
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? { mimeType: "audio/webm;codecs=opus" }
+        : {};
+
+      rec = new MediaRecorder(stream, options);
+      rec.ondataavailable = e => { if (e.data && e.data.size > 0) blobs.push(e.data); };
+      rec.onstop = doUpload;
+      rec.start();
+    } catch (e) {
+      alert("Error de micrófono. Permite acceso y usa http://127.0.0.1:5000");
+      updateStatus("Error: No se pudo acceder al micrófono");
+      console.error(e);
+    }
+  }
+
+  function stopRec() {
+    const recordDuration = Date.now() - recordStartTime;
+    
+    // Validar duración mínima (300ms)
+    if (recordDuration < 300) {
+      alert("Grabación muy corta. Habla al menos medio segundo.");
+      resetUI();
+      return;
+    }
+
+    updateStatus("⏳ Procesando audio...");
+    document.getElementById("record-stop-label").style.display = "none";
+    document.getElementById("record-stop-loading").style.display = "block";
+    document.getElementById("stop").disabled = true;
+
+    if (rec && rec.state !== "inactive") rec.stop();
+    if (stream) stream.getTracks().forEach(t => t.stop());
+  }
+
+  function resetUI() {
+    document.getElementById("record").style.display = "";
+    document.getElementById("stop").style.display = "none";
+    updateStatus("Presiona el micrófono para hablar");
+  }
+
+  function doUpload() {
+    if (!blobs.length) {
+      document.getElementById("text").innerHTML = "<span style='color: red;'>No se capturó audio</span>";
+      resetUI();
+      return;
+    }
+
+    const blob = new Blob(blobs);
+    const fd = new FormData();
+    fd.append("audio", blob, "grabacion.webm");
+
+    fetch("/audio", { method: "POST", body: fd })
+      .then(async (response) => {
+        const ct = response.headers.get("content-type") || "";
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`HTTP ${response.status} - ${text.substring(0, 200)}`);
         }
-
-        async function record() {
-            try {
-                document.getElementById("text").innerHTML = "<i>Grabando...</i>";
-                document.getElementById("record").style.display = "none";
-                document.getElementById("stop").style.display = "";
-                document.getElementById("record-stop-label").style.display = "block";
-                document.getElementById("record-stop-loading").style.display = "none";
-                document.getElementById("stop").disabled = false;
-
-                blobs = [];
-                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                rec = new MediaRecorder(stream);
-                rec.ondataavailable = e => { if (e.data) blobs.push(e.data); };
-                rec.onstop = doPreview;
-                rec.start();
-            } catch (e) {
-                alert("No fue posible iniciar el grabador de audio! Verifica los permisos, HTTPS, etc...");
-            }
+        if (!ct.includes("application/json")) {
+          const text = await response.text();
+          throw new Error(`Respuesta no-JSON: ${text.substring(0, 200)}`);
         }
-
-        function doPreview() {
-            if (!blobs.length) {
-                console.log("No hay blobios!");
-            } else {
-                console.log("Tenemos blobios!");
-                const blob = new Blob(blobs);
-                var fd = new FormData();
-                fd.append("audio", blob, "audio");
-
-                fetch(recordUrl, {
-                    method: "POST",
-                    body: fd,
-                })
-                .then((response) => response.json())
-                .then(audioResponseHandler)
-                .catch(err => {
-                    console.log("Oops: Ocurrió un error", err);
-                });
-            }
+        return response.json();
+      })
+      .then(res => {
+        resetUI();
+        
+        if (!res || res.result === "error") {
+          document.getElementById("text").innerHTML = `<span style='color: red;'>${res?.text || "Error procesando audio"}</span>`;
+          updateStatus("Error en el procesamiento");
+          return;
         }
-
-        function stop() {
-            document.getElementById("record-stop-label").style.display = "none";
-            document.getElementById("record-stop-loading").style.display = "block";
-            document.getElementById("stop").disabled = true;
-            rec.stop();
+        
+        const responseText = res.text || "(Sin respuesta)";
+        document.getElementById("text").textContent = responseText;
+        updateStatus("✅ Respuesta lista");
+        
+        if (res.file) {
+          const audio = new Audio(`/static/${res.file}?nocache=${Date.now()}`);
+          audio.play().catch(e => console.log("Error reproduciendo:", e));
         }
+      })
+      .catch(err => {
+        console.error("Error:", err);
+        document.getElementById("text").innerHTML = "<span style='color: red;'>Error de conexión. Revisa la consola.</span>";
+        updateStatus("❌ Error de servidor");
+        resetUI();
+      });
+  }
+</script>
 
-        function handleAudioResponse(response) {
-            if (!response || response == null) {
-                console.log("No response");
-                return;
-            }
-
-            document.getElementById("record").style.display = "";
-            document.getElementById("stop").style.display = "none";
-
-            if (audioResponseHandler != null) {
-                audioResponseHandler(response);
-            }
-        }
-
-        recorder("/audio", response => {
-            document.getElementById("record").style.display = "";
-            document.getElementById("stop").style.display = "none";
-
-            if (!response || response.result === "error") {
-                console.log("No se pudo generar audio.");
-                document.getElementById("text").innerHTML = response.text || "(Sin respuesta de texto)";
-                return;
-            }
-
-            console.log("El texto fue: " + response.text);
-            document.getElementById("text").innerHTML = response.text;
-
-            if (typeof response.file !== "undefined" && response.file != null) {
-                const audio = new Audio(`/static/${response.file}?nocache=${new Date().getTime()}`);
-                audio.play().catch(e => {
-                    console.log("Error al reproducir audio:", e);
-                });
-            } else {
-                console.warn("⚠️ No se generó archivo de audio, o falló el TTS.");
-            }
-        });
-    </script>
   </body>
 </html>
