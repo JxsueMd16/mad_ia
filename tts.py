@@ -8,7 +8,7 @@ class TTS:
     def __init__(self):
         load_dotenv()
         self.key = os.getenv('ELEVENLABS_API_KEY')
-        self.voice_id = "pNInz6obpgDQGcFmaJgB"  # voz base; puedes cambiarla en tu cuenta
+        self.voice_id = "Qrdut83w0Cr152Yb4Xn3"  # voz base;
 
     def process(self, text):
         CHUNK_SIZE = 1024

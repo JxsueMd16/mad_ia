@@ -8,5 +8,5 @@ class PcCommand():
     
     def open_chrome(self, website):
         website = "" if website is None else website
-        #Funciona para windows, si quieres para otro, modificalo!! :D
+        #Funciona para windows, si quieres para otro, modificalo!! 
         call("C:/Program Files/Google/Chrome/Application/chrome.exe " + website)

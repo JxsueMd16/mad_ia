@@ -1,6 +1,6 @@
 import os
 import json
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, session
 
@@ -10,7 +10,7 @@ from tts import TTS
 
 # Cargar llaves del archivo .env
 load_dotenv()
-openai.api_key = os.getenv('OPENAI_API_KEY')
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Configurar Flask
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -38,7 +38,7 @@ def audio():
                 "text": "No se detectó audio claro. Intenta hablar más cerca del micrófono."
             }, 200
 
-        # 2) LLM (chat corto, estilo robot)
+        # 2) LLM (chat corto, estilo electrónica)
         history = session.get("chat_history", None)
         llm = LLM(history)
         final_response = llm.chat(text)
@@ -59,14 +59,8 @@ def audio():
             "file": tts_file
         }, 200
 
-    except openai.error.InvalidRequestError as e:
-        print(f"Error de OpenAI: {e}")
-        return {
-            "result": "error",
-            "text": "El audio no se pudo procesar. Intenta grabar de nuevo."
-        }, 200
-
     except Exception as e:
+        print(f"Error general: {e}")
         import traceback
         traceback.print_exc()
         return {

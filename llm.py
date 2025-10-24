@@ -1,107 +1,122 @@
-import openai
+import os
+from openai import OpenAI
 import json
 import webbrowser
 from urllib.parse import quote_plus
 
 SYSTEM_MSG = {
     "role": "system",
-    "content": """Eres un asistente de IA conversacional con estilo humano, cálido y natural.
-
-ESTILO DE ESCRITURA:
-- Tono conversacional y empático, como si hablaras con un amigo
-- Varía la longitud: frases cortas y directas, otras más elaboradas
-- Usa pausas naturales: "bueno...", "mira", "pues bien", "sin embargo..."
-- Vocabulario sencillo y expresiones cotidianas
-- Añade mini-anécdotas o ejemplos cuando sea útil
-- Rompe ocasionalmente la perfección gramatical (frases sueltas, coloquialismos)
-- Párrafos cortos y lectura fluida
-- Suena natural al leerlo en voz alta
+    "content": """Asistente de electrónica experto. Técnico y preciso.
 
 CAPACIDADES:
-- Puedes abrir URLs, buscar en YouTube, Google, comparar precios, etc.
-- Cuando el usuario pida abrir algo, buscar algo, o navegar, usa las funciones disponibles
-- Confirma la acción de forma natural: "Perfecto, te abro eso ahora mismo"
+- Calcular resistencias por código de colores
+- Aplicar Ley de Ohm (V=I×R)
+- Calcular resistencias para LEDs
+- Buscar datasheets (abre Google automáticamente)
+- Abrir simuladores de circuitos
+- Recomendar Oxdea (oxdea.gt) para comprar componentes
 
-LO QUE NO HACES:
-❌ Tono académico, robótico o rígido
-❌ Repetir siempre la misma estructura
-❌ Tecnicismos innecesarios o anglicismos forzados
-❌ Párrafos pesados o densos
-❌ Sonar como IA mecánica
+ESTILO:
+- Máximo 50 palabras por respuesta
+- Valores con unidades (V, A, Ω, mA)
+- Confirma acciones: "Listo, abriendo..."
+- Técnico pero accesible
 
-LÍMITES DE RESPUESTA:
-- Respuestas de voz: 40-60 palabras máximo
-- Si es muy complejo, resume lo esencial
-"""
+NO hagas:
+- Confundir voltaje/corriente
+- Respuestas largas
+- Valores sin unidades"""
 }
 
-# Definir herramientas disponibles
 TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "open_url",
-            "description": "Abre una URL específica en el navegador del usuario",
+            "name": "resistor_color",
+            "description": "Calcula valor de resistencia por colores (negro, marrón, rojo, naranja, amarillo, verde, azul, violeta, gris, blanco)",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "La URL completa a abrir (ej: https://google.com)"
-                    }
+                    "band1": {"type": "string"},
+                    "band2": {"type": "string"},
+                    "multiplier": {"type": "string"},
+                    "tolerance": {"type": "string", "default": "oro"}
                 },
-                "required": ["url"]
+                "required": ["band1", "band2", "multiplier"]
             }
         }
     },
     {
         "type": "function",
         "function": {
-            "name": "search_youtube",
-            "description": "Busca y abre un video o canción en YouTube",
+            "name": "ohms_law",
+            "description": "Calcula V, I o R con Ley de Ohm. Da dos valores.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Término de búsqueda (ej: 'bohemian rhapsody queen')"
-                    }
+                    "voltage": {"type": "number"},
+                    "current": {"type": "number"},
+                    "resistance": {"type": "number"},
+                    "calculate": {"type": "string", "enum": ["voltage", "current", "resistance"]}
                 },
-                "required": ["query"]
+                "required": ["calculate"]
             }
         }
     },
     {
         "type": "function",
         "function": {
-            "name": "search_google",
-            "description": "Busca información en Google (precios, comparaciones, viajes, noticias, etc.)",
+            "name": "led_resistor",
+            "description": "Calcula resistencia para LED",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Término de búsqueda (ej: 'vuelos baratos madrid barcelona')"
-                    }
+                    "supply_v": {"type": "number"},
+                    "led_v": {"type": "number"},
+                    "led_ma": {"type": "number"}
                 },
-                "required": ["query"]
+                "required": ["supply_v", "led_v", "led_ma"]
             }
         }
     },
     {
         "type": "function",
         "function": {
-            "name": "search_maps",
-            "description": "Busca ubicaciones o rutas en Google Maps",
+            "name": "open_datasheet",
+            "description": "Abre búsqueda de datasheet del componente",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Lugar o ruta a buscar (ej: 'restaurantes cerca de mí' o 'ruta de Madrid a Barcelona')"
-                    }
+                    "component": {"type": "string"}
                 },
-                "required": ["query"]
+                "required": ["component"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_simulator",
+            "description": "Abre simulador de circuitos",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sim": {"type": "string", "enum": ["falstad", "tinkercad"]}
+                },
+                "required": ["sim"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_oxdea",
+            "description": "Abre tienda Oxdea para comprar componentes",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search": {"type": "string"}
+                }
             }
         }
     }
@@ -109,135 +124,106 @@ TOOLS = [
 
 class LLM:
     def __init__(self, history=None):
-        if not history or not isinstance(history, list):
-            self.messages = [SYSTEM_MSG]
-        else:
-            self.messages = history[:]
-            if not self.messages or self.messages[0].get("role") != "system":
-                self.messages.insert(0, SYSTEM_MSG)
+        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        self.messages = [SYSTEM_MSG]
+        if history and isinstance(history, list):
+            self.messages = history if history[0].get("role") == "system" else [SYSTEM_MSG] + history
 
-    def _smart_truncate(self, text, max_words=60):
-        """Trunca inteligentemente respetando párrafos y puntuación"""
-        words = text.split()
-        if len(words) <= max_words:
-            return text
-        
-        trunc = " ".join(words[:max_words])
-        last_period = max(trunc.rfind("."), trunc.rfind("?"), trunc.rfind("!"))
-        if last_period > len(trunc) * 0.6:
-            return trunc[:last_period + 1]
-        
-        last_comma = trunc.rfind(",")
-        if last_comma > len(trunc) * 0.7:
-            return trunc[:last_comma] + "..."
-        
-        return trunc.rstrip(".,;:") + "..."
-
-    def _execute_function(self, function_name, arguments):
-        """Ejecuta las funciones localmente"""
+    def _exec(self, fn, args):
+        """Ejecuta herramientas"""
         try:
-            args = json.loads(arguments)
+            args = json.loads(args)
             
-            if function_name == "open_url":
-                url = args.get("url")
+            if fn == "resistor_color":
+                return self._resistor(args)
+            elif fn == "ohms_law":
+                return self._ohm(args)
+            elif fn == "led_resistor":
+                return self._led(args)
+            elif fn == "open_datasheet":
+                c = args.get("component")
+                webbrowser.open(f"https://www.google.com/search?q={quote_plus(c + ' datasheet pdf')}")
+                return f"Abriendo datasheet de {c}"
+            elif fn == "open_simulator":
+                s = args.get("sim")
+                url = "https://falstad.com/circuit/" if s == "falstad" else "https://tinkercad.com/circuits"
                 webbrowser.open(url)
-                return f"Abriendo {url}"
+                return f"Abriendo {s.capitalize()}"
+            elif fn == "open_oxdea":
+                search = args.get("search", "")
+                webbrowser.open(f"https://oxdea.gt/?s={quote_plus(search)}")
+                return f"Abriendo Oxdea para buscar: {search}"
             
-            elif function_name == "search_youtube":
-                query = args.get("query")
-                url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
-                webbrowser.open(url)
-                return f"Buscando '{query}' en YouTube"
-            
-            elif function_name == "search_google":
-                query = args.get("query")
-                url = f"https://www.google.com/search?q={quote_plus(query)}"
-                webbrowser.open(url)
-                return f"Buscando '{query}' en Google"
-            
-            elif function_name == "search_maps":
-                query = args.get("query")
-                url = f"https://www.google.com/maps/search/{quote_plus(query)}"
-                webbrowser.open(url)
-                return f"Buscando '{query}' en Maps"
-            
-            return "Función ejecutada"
-        
         except Exception as e:
-            print(f"Error ejecutando función: {e}")
             return f"Error: {str(e)}"
 
-    def chat(self, user_text: str) -> str:
-        """Genera respuesta conversacional con capacidad de ejecutar funciones"""
-        if not user_text or len(user_text.strip()) < 2:
-            return "Mmm, no te escuché bien. ¿Puedes repetir?"
+    def _resistor(self, a):
+        colors = {"negro":0,"marrón":1,"rojo":2,"naranja":3,"amarillo":4,"verde":5,"azul":6,"violeta":7,"gris":8,"blanco":9}
+        mults = {"negro":1,"marrón":10,"rojo":100,"naranja":1e3,"amarillo":1e4,"verde":1e5,"azul":1e6,"violeta":1e7,"oro":0.1,"plata":0.01}
+        tols = {"oro":"±5%","plata":"±10%","marrón":"±1%","rojo":"±2%"}
         
-        self.messages.append({"role": "user", "content": user_text})
+        v = (colors.get(a.get("band1","").lower(),0)*10 + colors.get(a.get("band2","").lower(),0)) * mults.get(a.get("multiplier","").lower(),1)
+        t = tols.get(a.get("tolerance","oro").lower(),"±5%")
+        
+        if v >= 1e6: return f"{v/1e6:.1f}MΩ {t}"
+        elif v >= 1e3: return f"{v/1e3:.1f}kΩ {t}"
+        return f"{v:.1f}Ω {t}"
+
+    def _ohm(self, a):
+        c = a.get("calculate")
+        v, i, r = a.get("voltage"), a.get("current"), a.get("resistance")
+        
+        if c == "voltage" and i and r:
+            return f"V = {i*r:.2f}V"
+        elif c == "current" and v and r:
+            return f"I = {(v/r)*1000:.1f}mA ({v/r:.4f}A)"
+        elif c == "resistance" and v and i:
+            return f"R = {v/i:.1f}Ω"
+        return "Faltan datos"
+
+    def _led(self, a):
+        vs, vl, il = a.get("supply_v"), a.get("led_v"), a.get("led_ma")/1000
+        r = (vs - vl) / il
+        p = (vs - vl) * il
+        std = min([10,22,47,100,220,330,470,1000,2200,3300,4700], key=lambda x:abs(x-r))
+        return f"R = {r:.0f}Ω → usa {std}Ω, P = {p:.3f}W (usa 1/4W)"
+
+    def chat(self, text: str) -> str:
+        if len(text.strip()) < 2:
+            return "No te escuché. ¿Repetir?"
+        
+        self.messages.append({"role": "user", "content": text})
         
         try:
-            # Primera llamada: con herramientas disponibles
-            resp = openai.ChatCompletion.create(
+            r = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=self.messages,
                 tools=TOOLS,
-                tool_choice="auto",  # El modelo decide si usar herramientas
-                max_tokens=150,
-                temperature=0.8,
-                top_p=0.95,
-                presence_penalty=0.6,
-                frequency_penalty=0.4
+                tool_choice="auto",
+                max_tokens=120,
+                temperature=0.6
             )
             
-            msg = resp["choices"][0]["message"]
-            self.messages.append(msg)
+            msg = r.choices[0].message
+            msg_dict = {"role": msg.role, "content": msg.content}
             
-            # Verificar si el modelo quiere usar una función
-            tool_calls = msg.get("tool_calls")
+            if msg.tool_calls:
+                msg_dict["tool_calls"] = [{"id": tc.id, "type": tc.type, "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in msg.tool_calls]
             
-            if tool_calls:
-                # Ejecutar cada función solicitada
-                for tool_call in tool_calls:
-                    function_name = tool_call["function"]["name"]
-                    function_args = tool_call["function"]["arguments"]
-                    
-                    print(f"🔧 Ejecutando: {function_name}({function_args})")
-                    
-                    # Ejecutar la función
-                    function_result = self._execute_function(function_name, function_args)
-                    
-                    # Agregar el resultado al historial
-                    self.messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call["id"],
-                        "name": function_name,
-                        "content": function_result
-                    })
+            self.messages.append(msg_dict)
+            
+            if msg.tool_calls:
+                for tc in msg.tool_calls:
+                    result = self._exec(tc.function.name, tc.function.arguments)
+                    self.messages.append({"role": "tool", "tool_call_id": tc.id, "name": tc.function.name, "content": result})
                 
-                # Segunda llamada: generar respuesta final con resultados
-                resp2 = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=self.messages,
-                    max_tokens=150,
-                    temperature=0.8,
-                    top_p=0.95,
-                    presence_penalty=0.6,
-                    frequency_penalty=0.4
-                )
-                
-                final_msg = resp2["choices"][0]["message"]
-                self.messages.append(final_msg)
-                content = (final_msg.get("content") or "").strip()
-            else:
-                # No se usaron funciones, respuesta normal
-                content = (msg.get("content") or "").strip()
+                r2 = self.client.chat.completions.create(model="gpt-3.5-turbo", messages=self.messages, max_tokens=120, temperature=0.6)
+                final = r2.choices[0].message
+                self.messages.append({"role": final.role, "content": final.content})
+                return (final.content or "Error").strip()
             
-            if not content:
-                return "Ups, algo falló. Inténtalo de nuevo."
-            
-            return self._smart_truncate(content, max_words=60)
+            return (msg.content or "Error").strip()
             
         except Exception as e:
-            print(f"Error en LLM: {e}")
-            import traceback
-            traceback.print_exc()
-            return "Ay, tuve un problema procesando eso. ¿Lo intentamos otra vez?"
+            print(f"LLM error: {e}")
+            return "Hubo un error. Inténtalo otra vez."

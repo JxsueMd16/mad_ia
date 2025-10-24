@@ -3,60 +3,330 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Asistente de Voz IA</title>
+    <title>Asistente de Electrónica IA</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-      body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-      .container { max-width: 600px; }
-      .btn-record { border: none; background: transparent; transition: transform 0.2s; }
-      .btn-record:hover { transform: scale(1.05); }
-      .btn-record-green { filter: hue-rotate(80deg); }
-      .btn-record-red { filter: hue-rotate(0deg); animation: pulse 1.5s infinite; }
-      .mic-img { width: 96px; height: 96px; cursor: pointer; }
-      .record-spinner { vertical-align: middle; }
-      .text-box { 
-        background: rgba(255,255,255,0.95); 
-        border-radius: 12px; 
-        padding: 20px; 
-        min-height: 100px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      body { 
+        background: linear-gradient(135deg, #0a4d68 0%, #088395 50%, #05bfdb 100%); 
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
-      .robot-status { 
-        color: white; 
-        font-size: 0.9rem; 
-        margin-top: 10px;
-        opacity: 0.9;
+      .container { max-width: 700px; }
+      
+      /* Logo Oxdea */
+      .logo-container {
+        text-align: center;
+        margin-bottom: 20px;
       }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
+      .logo-container img {
+        max-width: 200px;
+        filter: brightness(0) invert(1);
+        opacity: 0.95;
+      }
+      
+      /* Robot animado */
+      .robot-container {
+        position: relative;
+        width: 140px;
+        height: 160px;
+        margin: 20px auto;
+      }
+      
+      .robot-head {
+        width: 100px;
+        height: 80px;
+        background: linear-gradient(145deg, #05bfdb, #088395);
+        border-radius: 20px;
+        position: relative;
+        margin: 0 auto;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        animation: float 3s ease-in-out infinite;
+      }
+      
+      .robot-antenna {
+        width: 4px;
+        height: 20px;
+        background: #05bfdb;
+        position: absolute;
+        top: -20px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 2px;
+      }
+      
+      .robot-antenna::after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        background: #00ff88;
+        border-radius: 50%;
+        position: absolute;
+        top: -8px;
+        left: -3px;
+        box-shadow: 0 0 15px #00ff88;
+        animation: blink 2s infinite;
+      }
+      
+      .robot-eyes {
+        display: flex;
+        justify-content: space-around;
+        padding: 20px 15px 0;
+      }
+      
+      .robot-eye {
+        width: 20px;
+        height: 20px;
+        background: white;
+        border-radius: 50%;
+        position: relative;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+      }
+      
+      .robot-eye::after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        background: #0a4d68;
+        border-radius: 50%;
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        animation: look 4s infinite;
+      }
+      
+      .robot-mouth {
+        width: 50px;
+        height: 6px;
+        background: white;
+        border-radius: 3px;
+        margin: 15px auto 0;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .robot-mouth.talking::before {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, #00ff88, transparent);
+        animation: wave 0.8s infinite;
+      }
+      
+      .robot-body {
+        width: 80px;
+        height: 60px;
+        background: linear-gradient(145deg, #088395, #0a4d68);
+        border-radius: 15px;
+        margin: 10px auto 0;
+        position: relative;
+        box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+      }
+      
+      .robot-arm {
+        width: 8px;
+        height: 40px;
+        background: #05bfdb;
+        position: absolute;
+        top: 10px;
+        border-radius: 4px;
+      }
+      
+      .robot-arm.left {
+        left: -12px;
+        animation: wave-left 2s ease-in-out infinite;
+      }
+      
+      .robot-arm.right {
+        right: -12px;
+        animation: wave-right 2s ease-in-out infinite 1s;
+      }
+      
+      .circuit-line {
+        position: absolute;
+        width: 2px;
+        height: 30px;
+        background: rgba(0,255,136,0.4);
+        top: 20px;
+      }
+      
+      .circuit-line:nth-child(1) { left: 20px; }
+      .circuit-line:nth-child(2) { left: 40px; }
+      .circuit-line:nth-child(3) { left: 60px; }
+      
+      /* Botón micrófono */
+      .btn-record-container {
+        text-align: center;
+        margin: 30px 0;
+      }
+      
+      .btn-record {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(145deg, #00ff88, #05bfdb);
+        box-shadow: 0 8px 25px rgba(5,191,219,0.4);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      
+      .btn-record:hover {
+        transform: scale(1.1);
+        box-shadow: 0 12px 35px rgba(5,191,219,0.6);
+      }
+      
+      .btn-record:active {
+        transform: scale(0.95);
+      }
+      
+      .btn-record.recording {
+        background: linear-gradient(145deg, #ff4444, #ff6b6b);
+        animation: pulse-record 1.5s infinite;
+      }
+      
+      .mic-icon {
+        font-size: 40px;
+        color: white;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      }
+      
+      /* Área de texto */
+      .text-box {
+        background: rgba(255,255,255,0.95);
+        border-radius: 15px;
+        padding: 25px;
+        min-height: 120px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        border: 2px solid #05bfdb;
+        font-size: 1.1rem;
+        color: #0a4d68;
+        line-height: 1.6;
+      }
+      
+      .status-text {
+        color: white;
+        font-size: 1rem;
+        margin-top: 15px;
+        text-align: center;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        font-weight: 500;
+      }
+      
+      .spinner-border {
+        width: 30px;
+        height: 30px;
+        border-width: 3px;
+      }
+      
+      /* Animaciones */
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+      }
+      
+      @keyframes blink {
+        0%, 90%, 100% { opacity: 1; }
+        95% { opacity: 0.3; }
+      }
+      
+      @keyframes look {
+        0%, 100% { transform: translate(5px, 5px); }
+        25% { transform: translate(2px, 5px); }
+        50% { transform: translate(8px, 5px); }
+        75% { transform: translate(5px, 7px); }
+      }
+      
+      @keyframes wave {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      
+      @keyframes wave-left {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(-15deg); }
+      }
+      
+      @keyframes wave-right {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(15deg); }
+      }
+      
+      @keyframes pulse-record {
+        0%, 100% { box-shadow: 0 8px 25px rgba(255,68,68,0.4); }
+        50% { box-shadow: 0 8px 45px rgba(255,68,68,0.8); }
+      }
+      
+      /* Efectos de circuito */
+      .circuit-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.05;
+        pointer-events: none;
+        background-image: 
+          repeating-linear-gradient(90deg, #00ff88 0px, transparent 1px, transparent 50px),
+          repeating-linear-gradient(0deg, #00ff88 0px, transparent 1px, transparent 50px);
+        z-index: -1;
       }
     </style>
   </head>
   <body>
+    <div class="circuit-bg"></div>
+    
     <div class="container py-4">
-      <h1 class="h3 text-center text-white mb-4">🤖 Asistente Robot</h1>
-
-      <div class="row mt-3 px-3">
-        <div class="col-12 text-center">
-          <!-- Botón grabar -->
-          <button type="button" class="btn-record btn-record-green" id="record" onclick="record()">
-            <img class="mic-img" src="/static/img/microphone.png" alt="grabar" />
-          </button>
-          
-          <!-- Botón detener -->
-          <button type="button" class="btn-record btn-record-red" id="stop" onclick="stopRec()" style="display:none">
-            <img class="mic-img" id="record-stop-label" src="/static/img/microphone.png" alt="detener" />
-            <span id="record-stop-loading" style="display: none">
-              <span class="spinner-border spinner-border-sm record-spinner text-light" role="status"></span>
-            </span>
-          </button>
-          
-          <div class="robot-status" id="status">Presiona el micrófono para hablar</div>
+      <!-- Logo Oxdea -->
+      <div class="logo-container">
+        <img src="https://i0.wp.com/oxdea.gt/wp-content/uploads/2020/06/logo.png?fit=491%2C151&ssl=1" alt="Oxdea">
+      </div>
+      
+      <!-- Robot animado -->
+      <div class="robot-container" id="robotContainer">
+        <div class="robot-head">
+          <div class="robot-antenna"></div>
+          <div class="robot-eyes">
+            <div class="robot-eye"></div>
+            <div class="robot-eye"></div>
+          </div>
+          <div class="robot-mouth" id="robotMouth"></div>
         </div>
+        <div class="robot-body">
+          <div class="robot-arm left"></div>
+          <div class="robot-arm right"></div>
+          <div class="circuit-line"></div>
+          <div class="circuit-line"></div>
+          <div class="circuit-line"></div>
+        </div>
+      </div>
+
+      <!-- Botón micrófono -->
+      <div class="btn-record-container">
+        <button type="button" class="btn-record" id="recordBtn" onclick="record()">
+          <span class="mic-icon" id="micIcon">🎤</span>
+        </button>
         
-        <div class="col-12 text-center mt-4">
-          <div id="text" class="text-box">Esperando comando...</div>
+        <button type="button" class="btn-record recording" id="stopBtn" onclick="stopRec()" style="display:none">
+          <span class="mic-icon" id="stopIcon">⏹️</span>
+          <span class="spinner-border text-light" id="loadingSpinner" style="display: none; position: absolute;"></span>
+        </button>
+      </div>
+      
+      <div class="status-text" id="status">💡 Presiona el micrófono para consultar</div>
+      
+      <!-- Área de respuesta -->
+      <div class="row mt-4 px-3">
+        <div class="col-12">
+          <div id="text" class="text-box">
+            <strong>🔌 Esperando consulta electrónica...</strong>
+            <br><br>
+            <small style="color: #666;">Puedo ayudarte con: resistencias, LEDs, Ley de Ohm, datasheets, circuitos y más.</small>
+          </div>
         </div>
       </div>
     </div>
@@ -66,25 +336,34 @@
   let stream;
   let rec;
   let recordStartTime;
+  const robotMouth = document.getElementById('robotMouth');
 
   function updateStatus(msg) {
-    document.getElementById("status").textContent = msg;
+    document.getElementById("status").innerHTML = msg;
+  }
+
+  function setRobotTalking(isTalking) {
+    if (isTalking) {
+      robotMouth.classList.add('talking');
+    } else {
+      robotMouth.classList.remove('talking');
+    }
   }
 
   async function record() {
     try {
       updateStatus("🔴 Grabando... Habla ahora");
-      document.getElementById("text").innerHTML = "<i style='color: #667eea;'>Escuchando...</i>";
-      document.getElementById("record").style.display = "none";
-      document.getElementById("stop").style.display = "";
-      document.getElementById("record-stop-label").style.display = "block";
-      document.getElementById("record-stop-loading").style.display = "none";
-      document.getElementById("stop").disabled = false;
+      setRobotTalking(true);
+      document.getElementById("text").innerHTML = "<i style='color: #088395;'>🎧 Escuchando tu consulta...</i>";
+      document.getElementById("recordBtn").style.display = "none";
+      document.getElementById("stopBtn").style.display = "inline-flex";
+      document.getElementById("stopIcon").style.display = "block";
+      document.getElementById("loadingSpinner").style.display = "none";
+      document.getElementById("stopBtn").disabled = false;
 
       blobs = [];
       recordStartTime = Date.now();
 
-      // Configuración de audio optimizada
       const constraints = { 
         audio: {
           echoCancellation: true,
@@ -106,7 +385,8 @@
       rec.start();
     } catch (e) {
       alert("Error de micrófono. Permite acceso y usa http://127.0.0.1:5000");
-      updateStatus("Error: No se pudo acceder al micrófono");
+      updateStatus("❌ Error: No se pudo acceder al micrófono");
+      setRobotTalking(false);
       console.error(e);
     }
   }
@@ -114,31 +394,31 @@
   function stopRec() {
     const recordDuration = Date.now() - recordStartTime;
     
-    // Validar duración mínima (300ms)
     if (recordDuration < 300) {
       alert("Grabación muy corta. Habla al menos medio segundo.");
       resetUI();
       return;
     }
 
-    updateStatus("⏳ Procesando audio...");
-    document.getElementById("record-stop-label").style.display = "none";
-    document.getElementById("record-stop-loading").style.display = "block";
-    document.getElementById("stop").disabled = true;
+    updateStatus("⚡ Procesando audio...");
+    document.getElementById("stopIcon").style.display = "none";
+    document.getElementById("loadingSpinner").style.display = "block";
+    document.getElementById("stopBtn").disabled = true;
 
     if (rec && rec.state !== "inactive") rec.stop();
     if (stream) stream.getTracks().forEach(t => t.stop());
   }
 
   function resetUI() {
-    document.getElementById("record").style.display = "";
-    document.getElementById("stop").style.display = "none";
-    updateStatus("Presiona el micrófono para hablar");
+    document.getElementById("recordBtn").style.display = "inline-flex";
+    document.getElementById("stopBtn").style.display = "none";
+    updateStatus("💡 Presiona el micrófono para consultar");
+    setRobotTalking(false);
   }
 
   function doUpload() {
     if (!blobs.length) {
-      document.getElementById("text").innerHTML = "<span style='color: red;'>No se capturó audio</span>";
+      document.getElementById("text").innerHTML = "<span style='color: red;'>❌ No se capturó audio</span>";
       resetUI();
       return;
     }
@@ -164,23 +444,24 @@
         resetUI();
         
         if (!res || res.result === "error") {
-          document.getElementById("text").innerHTML = `<span style='color: red;'>${res?.text || "Error procesando audio"}</span>`;
-          updateStatus("Error en el procesamiento");
+          document.getElementById("text").innerHTML = `<span style='color: red;'>❌ ${res?.text || "Error procesando audio"}</span>`;
+          updateStatus("⚠️ Error en el procesamiento");
           return;
         }
         
         const responseText = res.text || "(Sin respuesta)";
-        document.getElementById("text").textContent = responseText;
-        updateStatus("✅ Respuesta lista");
-        
+        document.getElementById("text").innerHTML = `<strong style="color: #05bfdb;">🤖 Respuesta:</strong><br><br>${responseText}`;
+       
         if (res.file) {
+          setRobotTalking(true);
           const audio = new Audio(`/static/${res.file}?nocache=${Date.now()}`);
           audio.play().catch(e => console.log("Error reproduciendo:", e));
+          audio.onended = () => setRobotTalking(false);
         }
       })
       .catch(err => {
         console.error("Error:", err);
-        document.getElementById("text").innerHTML = "<span style='color: red;'>Error de conexión. Revisa la consola.</span>";
+        document.getElementById("text").innerHTML = "<span style='color: red;'>❌ Error de conexión. Revisa la consola.</span>";
         updateStatus("❌ Error de servidor");
         resetUI();
       });
